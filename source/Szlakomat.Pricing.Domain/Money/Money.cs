@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Szlakomat.Pricing.Domain;
 
 /// <summary>
@@ -56,5 +58,6 @@ public sealed record Money
                 $"Nie można wykonać operacji na różnych walutach: {Currency} i {other.Currency}");
     }
 
-    public override string ToString() => $"{Currency} {Amount:F2}";
+    public override string ToString() =>
+        $"{Currency} {Amount.ToString("F2", CultureInfo.InvariantCulture)}";
 }
