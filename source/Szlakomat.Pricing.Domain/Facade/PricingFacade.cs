@@ -1,39 +1,55 @@
+using Szlakomat.Products.Domain.CommercialOffer;
+using Szlakomat.Products.Domain.Common.Applicability;
 using Szlakomat.Pricing.Domain.Calculators;
 using Szlakomat.Pricing.Domain.Calculators.Adapters;
+using Szlakomat.Pricing.Domain.Components;
+using Szlakomat.Pricing.Domain.Context;
 using Szlakomat.Pricing.Domain.Parameters;
 using Szlakomat.Pricing.Domain.Repository;
 
 namespace Szlakomat.Pricing.Domain.Facade;
 
 /// <summary>
-/// Główny punkt wejścia Etapu 1.
-/// Rejestruje kalkulatory i orkiestruje obliczenia z automatyczną konwersją interpretacji.
+/// Główny punkt wejścia — rejestracja kalkulatorów i komponentów, orkiestracja obliczeń.
 /// </summary>
 public sealed class PricingFacade
 {
-    private readonly ICalculatorRepository _repository;
+    private readonly ICalculatorRepository _calculatorRepository;
+    private readonly IComponentRepository _componentRepository;
 
-    public PricingFacade() : this(new InMemoryCalculatorRepository()) { }
-
-    public PricingFacade(ICalculatorRepository repository)
+    public PricingFacade()
+        : this(new InMemoryCalculatorRepository(), new InMemoryComponentRepository())
     {
-        Guard.IsNotNull(repository, nameof(repository));
-        _repository = repository;
     }
 
-    // ── Rejestracja ──────────────────────────────────────────────────────────
+    public PricingFacade(ICalculatorRepository calculatorRepository)
+        : this(calculatorRepository, new InMemoryComponentRepository())
+    {
+    }
+
+    public PricingFacade(
+        ICalculatorRepository calculatorRepository,
+        IComponentRepository componentRepository)
+    {
+        Guard.IsNotNull(calculatorRepository, nameof(calculatorRepository));
+        Guard.IsNotNull(componentRepository, nameof(componentRepository));
+        _calculatorRepository = calculatorRepository;
+        _componentRepository = componentRepository;
+    }
+
+    // ── Rejestracja kalkulatorów ─────────────────────────────────────────────
 
     public PricingFacade AddFixedCalculator(string name, Money price)
     {
         var calc = new SimpleFixedCalculator(Guid.NewGuid(), name, price);
-        _repository.Save(calc);
+        _calculatorRepository.Save(calc);
         return this;
     }
 
     public PricingFacade AddPercentageCalculator(string name, decimal ratePercent)
     {
         var calc = new PercentageCalculator(Guid.NewGuid(), name, ratePercent);
-        _repository.Save(calc);
+        _calculatorRepository.Save(calc);
         return this;
     }
 
@@ -44,14 +60,14 @@ public sealed class PricingFacade
         Money increment)
     {
         var calc = new StepFunctionCalculator(Guid.NewGuid(), name, basePrice, stepSize, increment);
-        _repository.Save(calc);
+        _calculatorRepository.Save(calc);
         return this;
     }
 
     public PricingFacade AddDiscreteCalculator(string name, IReadOnlyDictionary<int, Money> points)
     {
         var calc = new DiscretePointsCalculator(Guid.NewGuid(), name, points);
-        _repository.Save(calc);
+        _calculatorRepository.Save(calc);
         return this;
     }
 
@@ -62,11 +78,64 @@ public sealed class PricingFacade
         Money dailyIncrement)
     {
         var calc = new DailyIncrementCalculator(Guid.NewGuid(), name, startPrice, referenceDate, dailyIncrement);
-        _repository.Save(calc);
+        _calculatorRepository.Save(calc);
         return this;
     }
 
-    // ── Obliczenia ───────────────────────────────────────────────────────────
+    // ── Rejestracja komponentów ──────────────────────────────────────────────
+
+    public PricingFacade CreateSimpleComponent(
+        string name,
+        string calculatorName,
+        IApplicabilityConstraint? applicability = null,
+        Validity? validity = null,
+        IReadOnlyDictionary<string, string>? parameterMappings = null,
+        bool contributesToTotal = true)
+    {
+        Guard.IsNotNullOrWhiteSpace(name, nameof(name));
+        Guard.IsNotNullOrWhiteSpace(calculatorName, nameof(calculatorName));
+
+        var calculator = _calculatorRepository.FindByName(calculatorName);
+        var component = new SimpleComponent(
+            Guid.NewGuid(),
+            name,
+            calculator,
+            applicability,
+            validity,
+            parameterMappings,
+            contributesToTotal);
+
+        _componentRepository.Save(component);
+        return this;
+    }
+
+    public PricingFacade CreateCompositeComponent(
+        string name,
+        IReadOnlyList<string> childNames,
+        IApplicabilityConstraint? applicability = null,
+        Validity? validity = null,
+        IReadOnlyList<ParameterDependency>? parameterDependencies = null)
+    {
+        Guard.IsNotNullOrWhiteSpace(name, nameof(name));
+        Guard.IsNotNull(childNames, nameof(childNames));
+
+        var children = childNames
+            .Select(childName => _componentRepository.FindByName(childName))
+            .ToList();
+
+        var component = new CompositeComponent(
+            Guid.NewGuid(),
+            name,
+            children,
+            applicability,
+            validity,
+            parameterDependencies);
+
+        _componentRepository.Save(component);
+        return this;
+    }
+
+    // ── Obliczenia kalkulatorów ────────────────────────────────────────────────
 
     /// <summary>Zwraca wynik w natywnej interpretacji kalkulatora.</summary>
     public Money Calculate(string name, PricingParameters parameters)
@@ -74,7 +143,7 @@ public sealed class PricingFacade
         Guard.IsNotNullOrWhiteSpace(name, nameof(name));
         Guard.IsNotNull(parameters, nameof(parameters));
 
-        var calc = _repository.FindByName(name);
+        var calc = _calculatorRepository.FindByName(name);
         return calc.Calculate(parameters);
     }
 
@@ -84,9 +153,8 @@ public sealed class PricingFacade
         Guard.IsNotNullOrWhiteSpace(name, nameof(name));
         Guard.IsNotNull(parameters, nameof(parameters));
 
-        var calc = _repository.FindByName(name);
-        var adapted = AdaptTo(calc, Interpretation.Total);
-        return adapted.Calculate(parameters);
+        var calc = _calculatorRepository.FindByName(name);
+        return CalculatorInterpretation.CalculateAsTotal(calc, parameters);
     }
 
     /// <summary>Zwraca Unit — automatycznie adaptuje, jeśli kalkulator ma inną interpretację.</summary>
@@ -95,32 +163,52 @@ public sealed class PricingFacade
         Guard.IsNotNullOrWhiteSpace(name, nameof(name));
         Guard.IsNotNull(parameters, nameof(parameters));
 
-        var calc = _repository.FindByName(name);
-        var adapted = AdaptTo(calc, Interpretation.Unit);
+        var calc = _calculatorRepository.FindByName(name);
+        var adapted = CalculatorInterpretation.AdaptTo(calc, Interpretation.Unit);
         return adapted.Calculate(parameters);
     }
 
-    // ── Diagnostyka ──────────────────────────────────────────────────────────
+    // ── Obliczenia komponentów ─────────────────────────────────────────────────
+
+    public Money CalculateComponent(
+        string componentName,
+        PricingParameters parameters,
+        PricingContext context)
+    {
+        Guard.IsNotNullOrWhiteSpace(componentName, nameof(componentName));
+        Guard.IsNotNull(parameters, nameof(parameters));
+        Guard.IsNotNull(context, nameof(context));
+
+        var component = _componentRepository.FindByName(componentName);
+        return component.Calculate(parameters, context);
+    }
+
+    public PriceBreakdown CalculateComponentBreakdown(
+        string componentName,
+        PricingParameters parameters,
+        PricingContext context)
+    {
+        Guard.IsNotNullOrWhiteSpace(componentName, nameof(componentName));
+        Guard.IsNotNull(parameters, nameof(parameters));
+        Guard.IsNotNull(context, nameof(context));
+
+        var component = _componentRepository.FindByName(componentName);
+        return component.CalculateBreakdown(parameters, context);
+    }
+
+    // ── Diagnostyka ───────────────────────────────────────────────────────────
 
     public IReadOnlyList<CalculatorView> ListCalculators() =>
-        _repository.FindAll()
+        _calculatorRepository.FindAll()
             .Select(c => new CalculatorView(c.Id, c.Name, c.Type, c.Interpretation, c.Formula))
             .ToList();
 
-    // ── Prywatne ─────────────────────────────────────────────────────────────
-
-    private static ICalculator AdaptTo(ICalculator calc, Interpretation target)
-    {
-        if (calc.Interpretation == target)
-            return calc;
-
-        return (calc.Interpretation, target) switch
-        {
-            (Interpretation.Unit, Interpretation.Total) => new UnitToTotalAdapter(calc),
-            (Interpretation.Total, Interpretation.Unit) => new TotalToUnitAdapter(calc),
-            (Interpretation.Total, Interpretation.Marginal) => new TotalToMarginalAdapter(calc),
-            _ => throw new InvalidOperationException(
-                $"Brak adaptera z interpretacji {calc.Interpretation} do {target}")
-        };
-    }
+    public IReadOnlyList<ComponentView> ListComponents() =>
+        _componentRepository.FindAll()
+            .Select(c => new ComponentView(
+                c.ComponentId,
+                c.Name,
+                c is CompositeComponent ? "Composite" : "Simple",
+                c.Interpretation))
+            .ToList();
 }

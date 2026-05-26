@@ -75,21 +75,21 @@ Czysta domena pricingu bez integracji z resztą systemu. Działa samodzielnie, w
 
 ---
 
-## Etap 2 — Komponenty ⬜ TODO
+## Etap 2 — Komponenty ✅ UKOŃCZONY
 
 Warstwa komponentów z osią Applicability i Validity. Pierwsza prawdziwa kompozycja cennika.
 
 ### Checklist
 
-- [ ] `IComponent` (sealed interface) z `Calculate`, `CalculateBreakdown`, `Interpretation`, `Name`, `ComponentId`
-- [ ] `SimpleComponent` (liść) — opakowuje `ICalculator`, sprawdza `Validity` i `IApplicabilityConstraint`
-- [ ] `CompositeComponent` (węzeł) — własne Applicability, sumowanie dzieci, `parameterDependencies`
-- [ ] `PriceBreakdown` — drzewo: `ComponentName`, `Total`, `Children`
-- [ ] `IComponentRepository` + in-memory implementacja
-- [ ] `PricingFacade` rozszerzona o `CreateSimpleComponent`, `CreateCompositeComponent`, `CalculateComponent`, `CalculateComponentBreakdown`
-- [ ] Seed: pierwsze drzewo Wawelu (Skarbiec z taryfami STANDARD / REDUCED / B2B)
-- [ ] `SimpleComponentTests`, `CompositeComponentTests` — Validity, Applicability, brak pasującego dziecka → zero
-- [ ] Journey testy przez `PricingFacade`: 7+ scenariuszy (STANDARD, SENIOR, B2B, brak applicability, VAT od sumy)
+- [x] `IComponent` (sealed interface) z `Calculate`, `CalculateBreakdown`, `Interpretation`, `Name`, `ComponentId`
+- [x] `SimpleComponent` (liść) — opakowuje `ICalculator`, sprawdza `Validity` i `IApplicabilityConstraint`
+- [x] `CompositeComponent` (węzeł) — własne Applicability, sumowanie dzieci, `parameterDependencies`
+- [x] `PriceBreakdown` — drzewo: `ComponentName`, `Total`, `Children`
+- [x] `IComponentRepository` + in-memory implementacja
+- [x] `PricingFacade` rozszerzona o `CreateSimpleComponent`, `CreateCompositeComponent`, `CalculateComponent`, `CalculateComponentBreakdown`
+- [x] Seed: pierwsze drzewo Wawelu (Skarbiec z taryfami STANDARD / REDUCED / B2B) + VAT od sumy netto
+- [x] `SimpleComponentTests`, `CompositeComponentTests` — Validity, Applicability, brak pasującego dziecka → zero
+- [x] Journey testy przez `PricingFacade`: 7+ scenariuszy (STANDARD, SENIOR, B2B, brak applicability, VAT od sumy)
 
 ---
 
