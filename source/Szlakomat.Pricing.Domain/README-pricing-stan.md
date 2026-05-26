@@ -1,6 +1,6 @@
 # Szlakomat.Pricing — Stan implementacji
 
-> Etap 1–2 ukończone · .NET 10 · C# · DDD · xUnit · FluentAssertions
+> Etap 1–3 ukończone · .NET 10 · C# · DDD · xUnit · FluentAssertions
 
 ---
 
@@ -9,7 +9,7 @@
 | Projekt | Opis |
 |---|---|
 | `Szlakomat.Pricing.Domain` | Czysta domena pricingu — bez zależności od MediatR, HTTP ani baz danych |
-| `Szlakomat.Pricing.Domain.Tests` | Testy jednostkowe + journey domeny — Etap 1 i Etap 2 |
+| `Szlakomat.Pricing.Domain.Tests` | Testy jednostkowe + journey domeny — Etap 1–3 |
 
 ---
 
@@ -150,6 +150,44 @@ B2B jest realizowane jako procent od bazowej kwoty po przeskalowaniu przez quant
 
 ---
 
+## Etap 3 — Wersjonowanie
+
+Etap 3 dodaje historię wersji komponentów. `CreateSimpleComponent` / `CreateCompositeComponent` rejestrują `VersionedComponent` z pierwszą wersją.
+
+### VersionedComponent (`Components/Versioning/VersionedComponent.cs`)
+
+- Przechowuje listę snapshotów (`SimpleComponentVersionData` / `CompositeComponentVersionData`)
+- Przy `Calculate` / `CalculateBreakdown` wybiera wersję przez `ComponentVersionSelector` i materializuje liść lub kompozyt
+- Dzieci kompozytu rozwiązywane po nazwie z repozytorium — wersjonowane dzieci dostają własną wersję na `VisitDate`
+- `ContributesToTotal` delegowane ze snapshotu (np. `skarbiec_base` pozostaje niekontrybuujący)
+
+### ComponentVersion (`Components/Versioning/VersionedComponent.cs`)
+
+Publiczny widok metadanych: `Validity` + `DefinedAt`.
+
+### Wybór wersji (`ComponentVersionSelector`)
+
+1. Filtruj wersje, gdzie `Validity.IsValidAt(visitDate)`
+2. Wybierz najpóźniejszy `validFrom` (`Validity.From`)
+3. Przy remisie — najpóźniejszy `DefinedAt`
+4. Brak kandydatów → `NoActiveComponentVersionException`
+
+### PricingFacade — API Etapu 3
+
+- `UpdateSimpleComponent(name, calculatorName, validity, …)` — nowa wersja liścia
+- `UpdateCompositeComponent(name, childNames, validity, …)` — nowa wersja kompozytu
+- `VersionAdditionStrategy.RejectIdentical` (domyślna) / `AllowAll`
+- `DuplicateComponentVersionException` przy duplikacie konfiguracji
+
+### Wyjątki
+
+| Wyjątek | Kiedy |
+|---|---|
+| `NoActiveComponentVersionException` | Brak wersji obowiązującej w dniu wizyty |
+| `DuplicateComponentVersionException` | Identyczna wersja przy `RejectIdentical` |
+
+---
+
 ## Testy
 
 Wzorzec: Arrange / Act / Assert + FluentAssertions. Każdy test niezależny — brak wspólnego stanu.
@@ -167,3 +205,5 @@ Wzorzec: Arrange / Act / Assert + FluentAssertions. Każdy test niezależny — 
 | `SimpleComponentTests` | Validity, Applicability, quantity→Total, parameterMappings |
 | `CompositeComponentTests` | Applicability rodzica, brak pasującego dziecka → zero, `ParameterDependency` (np. VAT) |
 | `WawelTicketPricingJourneyTests` | Journey Etapu 2 przez `PricingFacade` (STANDARD, SENIOR, B2B, breakdown, VAT od sumy) |
+| `HistoricalCalculationTests` | Journey Etapu 3 — zmiana ceny w czasie, wygasanie promocji, tiebreaker `DefinedAt`, wersjonowane dzieci |
+| `ComponentVersionSelectorTests` | Reguła wyboru wersji, brak aktywnej wersji |

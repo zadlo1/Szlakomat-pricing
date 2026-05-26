@@ -93,19 +93,19 @@ Warstwa komponentów z osią Applicability i Validity. Pierwsza prawdziwa kompoz
 
 ---
 
-## Etap 3 — Wersjonowanie ⬜ TODO
+## Etap 3 — Wersjonowanie ✅ UKOŃCZONY
 
 Każdy komponent ma historię wersji. Obliczenia historyczne używają reguł z dnia zdarzenia.
 
 ### Checklist
 
-- [ ] `ComponentVersion` — snapshot konfiguracji + `Validity` + `DefinedAt` (DateTime)
-- [ ] `SimpleComponent` i `CompositeComponent` przechowują listę `ComponentVersion`
-- [ ] Reguła wyboru wersji: najpóźniejszy `validFrom`, `DefinedAt` jako tiebreaker
-- [ ] Brak aktywnej wersji → wyjątek (nie cicha zero)
-- [ ] `PricingFacade.UpdateComponent(name, newConfig, validity)` — dodaje nową wersję, stare niemodyfikowalne
-- [ ] Strategia walidacji: `RejectIdentical` (domyślna), `AllowAll` (testy)
-- [ ] `HistoricalCalculationTests` — obliczenia historyczne, wygasanie promocji, nakładające się wersje
+- [x] `ComponentVersion` — metadane wersji (`Validity` + `DefinedAt`); snapshot w `SimpleComponentVersionData` / `CompositeComponentVersionData`
+- [x] `VersionedComponent` — opakowuje listę wersji; materializuje `SimpleComponent` / `CompositeComponent` na czas obliczenia
+- [x] Reguła wyboru wersji: najpóźniejszy `validFrom`, `DefinedAt` jako tiebreaker (`ComponentVersionSelector`)
+- [x] Brak aktywnej wersji → `NoActiveComponentVersionException` (nie cicha zero)
+- [x] `PricingFacade.UpdateSimpleComponent` / `UpdateCompositeComponent` — dodaje nową wersję, stare niemodyfikowalne
+- [x] Strategia walidacji: `RejectIdentical` (domyślna), `AllowAll` (testy)
+- [x] `HistoricalCalculationTests`, `ComponentVersionSelectorTests` — obliczenia historyczne, wygasanie promocji, nakładające się wersje
 
 ---
 
