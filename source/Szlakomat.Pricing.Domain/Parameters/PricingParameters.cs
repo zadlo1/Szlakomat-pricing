@@ -32,6 +32,18 @@ public sealed class PricingParameters
 
     public bool Contains(string key) => _values.ContainsKey(key);
 
+    public bool TryGet(string key, out object? value)
+    {
+        if (_values.TryGetValue(key, out var raw))
+        {
+            value = raw;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
     public Money GetMoney(string key)
     {
         if (!_values.TryGetValue(key, out var raw))

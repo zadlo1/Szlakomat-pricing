@@ -6,7 +6,7 @@ namespace Szlakomat.Products.Domain.CommercialOffer;
 /// - Brak daty "od" = ważne od początku czasów
 /// - Brak daty "do" = ważne na zawsze
 /// </summary>
-internal class Validity
+public sealed class Validity
 {
     public DateOnly? From { get; }
     public DateOnly? To { get; }
