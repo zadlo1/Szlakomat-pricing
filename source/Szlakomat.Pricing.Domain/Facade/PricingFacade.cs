@@ -5,6 +5,7 @@ using Szlakomat.Pricing.Domain.Calculators.Adapters;
 using Szlakomat.Pricing.Domain.Components;
 using Szlakomat.Pricing.Domain.Context;
 using Szlakomat.Pricing.Domain.Parameters;
+using Szlakomat.Pricing.Domain.Components.Versioning;
 using Szlakomat.Pricing.Domain.Repository;
 
 namespace Szlakomat.Pricing.Domain.Facade;
@@ -90,20 +91,29 @@ public sealed class PricingFacade
         IApplicabilityConstraint? applicability = null,
         Validity? validity = null,
         IReadOnlyDictionary<string, string>? parameterMappings = null,
-        bool contributesToTotal = true)
+        bool contributesToTotal = true,
+        DateTime? definedAt = null)
     {
         Guard.IsNotNullOrWhiteSpace(name, nameof(name));
         Guard.IsNotNullOrWhiteSpace(calculatorName, nameof(calculatorName));
 
-        var calculator = _calculatorRepository.FindByName(calculatorName);
-        var component = new SimpleComponent(
+        _ = _calculatorRepository.FindByName(calculatorName);
+
+        var version = new SimpleComponentVersionData(
+            validity ?? Validity.Always(),
+            definedAt ?? DateTime.UtcNow,
+            calculatorName,
+            applicability ?? ApplicabilityConstraint.AlwaysTrue(),
+            parameterMappings ?? new Dictionary<string, string>(),
+            contributesToTotal);
+
+        var component = new VersionedComponent(
             Guid.NewGuid(),
             name,
-            calculator,
-            applicability,
-            validity,
-            parameterMappings,
-            contributesToTotal);
+            ComponentKind.Simple,
+            [version],
+            _calculatorRepository,
+            _componentRepository);
 
         _componentRepository.Save(component);
         return this;
@@ -114,23 +124,95 @@ public sealed class PricingFacade
         IReadOnlyList<string> childNames,
         IApplicabilityConstraint? applicability = null,
         Validity? validity = null,
-        IReadOnlyList<ParameterDependency>? parameterDependencies = null)
+        IReadOnlyList<ParameterDependency>? parameterDependencies = null,
+        DateTime? definedAt = null)
     {
         Guard.IsNotNullOrWhiteSpace(name, nameof(name));
         Guard.IsNotNull(childNames, nameof(childNames));
 
-        var children = childNames
-            .Select(childName => _componentRepository.FindByName(childName))
-            .ToList();
+        foreach (var childName in childNames)
+            _ = _componentRepository.FindByName(childName);
 
-        var component = new CompositeComponent(
+        var version = new CompositeComponentVersionData(
+            validity ?? Validity.Always(),
+            definedAt ?? DateTime.UtcNow,
+            childNames.ToList(),
+            applicability ?? ApplicabilityConstraint.AlwaysTrue(),
+            parameterDependencies ?? []);
+
+        var component = new VersionedComponent(
             Guid.NewGuid(),
             name,
-            children,
-            applicability,
-            validity,
-            parameterDependencies);
+            ComponentKind.Composite,
+            [version],
+            _calculatorRepository,
+            _componentRepository);
 
+        _componentRepository.Save(component);
+        return this;
+    }
+
+    public PricingFacade UpdateSimpleComponent(
+        string name,
+        string calculatorName,
+        Validity validity,
+        IApplicabilityConstraint? applicability = null,
+        IReadOnlyDictionary<string, string>? parameterMappings = null,
+        bool contributesToTotal = true,
+        DateTime? definedAt = null,
+        VersionAdditionStrategy strategy = VersionAdditionStrategy.RejectIdentical)
+    {
+        Guard.IsNotNullOrWhiteSpace(name, nameof(name));
+        Guard.IsNotNullOrWhiteSpace(calculatorName, nameof(calculatorName));
+        Guard.IsNotNull(validity, nameof(validity));
+
+        _ = _calculatorRepository.FindByName(calculatorName);
+
+        var component = RequireVersionedComponent(name);
+        if (component.Kind != ComponentKind.Simple)
+            throw new InvalidOperationException($"Komponent '{name}' nie jest komponentem prostym.");
+
+        var version = new SimpleComponentVersionData(
+            validity,
+            definedAt ?? DateTime.UtcNow,
+            calculatorName,
+            applicability ?? ApplicabilityConstraint.AlwaysTrue(),
+            parameterMappings ?? new Dictionary<string, string>(),
+            contributesToTotal);
+
+        component.AddVersion(version, strategy);
+        _componentRepository.Save(component);
+        return this;
+    }
+
+    public PricingFacade UpdateCompositeComponent(
+        string name,
+        IReadOnlyList<string> childNames,
+        Validity validity,
+        IApplicabilityConstraint? applicability = null,
+        IReadOnlyList<ParameterDependency>? parameterDependencies = null,
+        DateTime? definedAt = null,
+        VersionAdditionStrategy strategy = VersionAdditionStrategy.RejectIdentical)
+    {
+        Guard.IsNotNullOrWhiteSpace(name, nameof(name));
+        Guard.IsNotNull(childNames, nameof(childNames));
+        Guard.IsNotNull(validity, nameof(validity));
+
+        foreach (var childName in childNames)
+            _ = _componentRepository.FindByName(childName);
+
+        var component = RequireVersionedComponent(name);
+        if (component.Kind != ComponentKind.Composite)
+            throw new InvalidOperationException($"Komponent '{name}' nie jest komponentem złożonym.");
+
+        var version = new CompositeComponentVersionData(
+            validity,
+            definedAt ?? DateTime.UtcNow,
+            childNames.ToList(),
+            applicability ?? ApplicabilityConstraint.AlwaysTrue(),
+            parameterDependencies ?? []);
+
+        component.AddVersion(version, strategy);
         _componentRepository.Save(component);
         return this;
     }
@@ -205,10 +287,33 @@ public sealed class PricingFacade
 
     public IReadOnlyList<ComponentView> ListComponents() =>
         _componentRepository.FindAll()
-            .Select(c => new ComponentView(
-                c.ComponentId,
-                c.Name,
-                c is CompositeComponent ? "Composite" : "Simple",
-                c.Interpretation))
+            .Select(c => c switch
+            {
+                VersionedComponent versioned => new ComponentView(
+                    versioned.ComponentId,
+                    versioned.Name,
+                    versioned.Kind.ToString(),
+                    versioned.Interpretation,
+                    versioned.VersionCount),
+                CompositeComponent => new ComponentView(
+                    c.ComponentId,
+                    c.Name,
+                    "Composite",
+                    c.Interpretation),
+                _ => new ComponentView(
+                    c.ComponentId,
+                    c.Name,
+                    "Simple",
+                    c.Interpretation),
+            })
             .ToList();
+
+    private VersionedComponent RequireVersionedComponent(string name)
+    {
+        var component = _componentRepository.FindByName(name);
+        if (component is not VersionedComponent versioned)
+            throw new InvalidOperationException(
+                $"Komponent '{name}' nie obsługuje wersjonowania (oczekiwano {nameof(VersionedComponent)}).");
+        return versioned;
+    }
 }

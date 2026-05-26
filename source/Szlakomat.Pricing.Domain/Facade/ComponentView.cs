@@ -6,4 +6,5 @@ public sealed record ComponentView(
     Guid Id,
     string Name,
     string Kind,
-    Calculators.Interpretation Interpretation);
+    Calculators.Interpretation Interpretation,
+    int? VersionCount = null);
