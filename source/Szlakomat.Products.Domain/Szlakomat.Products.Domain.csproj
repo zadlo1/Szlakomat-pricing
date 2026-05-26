@@ -11,6 +11,7 @@
     <InternalsVisibleTo Include="Szlakomat.Products.Application.Tests" />
     <InternalsVisibleTo Include="Szlakomat.Products.Architecture.Tests" />
     <InternalsVisibleTo Include="Szlakomat.Products.Domain.Tests" />
+    <InternalsVisibleTo Include="Szlakomat.Pricing.Infrastructure" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.2.2" />
