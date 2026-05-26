@@ -1,6 +1,6 @@
 # Szlakomat.Pricing — Stan implementacji
 
-> Etap 1–3 ukończone · .NET 10 · C# · DDD · xUnit · FluentAssertions
+> Etap 1–4 ukończone · .NET 10 · C# · DDD · xUnit · FluentAssertions
 
 ---
 
@@ -9,7 +9,10 @@
 | Projekt | Opis |
 |---|---|
 | `Szlakomat.Pricing.Domain` | Czysta domena pricingu — bez zależności od MediatR, HTTP ani baz danych |
+| `Szlakomat.Pricing.Application` | CQRS: `CalculatePrice` + integracja z katalogiem CommercialOffer |
+| `Szlakomat.Pricing.Infrastructure` | DI (`AddPricingModule`), repozytoria in-memory, `WawelPricingSeed` |
 | `Szlakomat.Pricing.Domain.Tests` | Testy jednostkowe + journey domeny — Etap 1–3 |
+| `Szlakomat.Pricing.Application.Tests` | Journey przez MediatR — Etap 4 |
 
 ---
 
@@ -188,6 +191,36 @@ Publiczny widok metadanych: `Validity` + `DefinedAt`.
 
 ---
 
+## Etap 4 — Integracja i API
+
+Pricing dostępny przez HTTP w `Szlakomat.Products.Api` (`PricingController`).
+
+### CalculatePrice (`Application/CalculatePrice/`)
+
+Komenda MediatR: `CatalogEntryId`, `VisitDate`, `CustomerType`, `GroupSize`, opcjonalnie `IncludeBreakdown`.
+
+Handler:
+1. Waliduje wpis katalogowy (`FindCatalogEntryCriteria` z Products)
+2. Szuka mapowania `ICatalogEntryPricingRepository`
+3. Wywołuje `PricingFacade.CalculateComponent` / `CalculateComponentBreakdown`
+
+### CatalogEntryPricing (`Application/Integration/`)
+
+Mapowanie `catalogEntryId → componentName` (in-memory w Infrastructure).
+
+### WawelPricingSeed (`Infrastructure/Seed/`)
+
+- Seed komponentów: `WawelSkarbiecTicketSeed` (jak Etap 2–3)
+- Mapowanie: wpis katalogowy „Skarbiec Koronny” → `wawel_ticket`
+
+### API
+
+`POST /api/pricing/calculate` — body: `catalogEntryId`, `visitDate` (ISO), `customerType`, `groupSize`, `includeBreakdown`.
+
+Rejestracja: `Program.cs` → `AddPricingModule()` po `AddProductModule()`.
+
+---
+
 ## Testy
 
 Wzorzec: Arrange / Act / Assert + FluentAssertions. Każdy test niezależny — brak wspólnego stanu.
@@ -207,3 +240,4 @@ Wzorzec: Arrange / Act / Assert + FluentAssertions. Każdy test niezależny — 
 | `WawelTicketPricingJourneyTests` | Journey Etapu 2 przez `PricingFacade` (STANDARD, SENIOR, B2B, breakdown, VAT od sumy) |
 | `HistoricalCalculationTests` | Journey Etapu 3 — zmiana ceny w czasie, wygasanie promocji, tiebreaker `DefinedAt`, wersjonowane dzieci |
 | `ComponentVersionSelectorTests` | Reguła wyboru wersji, brak aktywnej wersji |
+| `WawelPricingJourneyTests` | Journey Etapu 4 przez MediatR (standard, senior, B2B, zero, nieznany wpis, brak mapowania, breakdown) |
