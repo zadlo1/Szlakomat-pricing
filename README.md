@@ -720,7 +720,8 @@ source/
 |       |-- ProductsController.cs
 |       |-- CatalogController.cs
 |       |-- InstancesController.cs
-|       +-- RelationshipsController.cs
+|       |-- RelationshipsController.cs
+|       +-- PricingController.cs                    # POST /api/pricing/calculate
 |
 |-- Szlakomat.Products.Domain.Tests/                # xUnit + FluentAssertions
 |   +-- Domain/ValueObjects/
@@ -738,6 +739,12 @@ source/
 |   |-- Instances/VisitorTicketPurchaseJourneyTests.cs
 |   |-- Relationships/TicketRelationshipJourneyTests.cs
 |   +-- Integration/CityTourismPlatformIntegrationTest.cs
+|
+|-- Szlakomat.Pricing.Domain/                       # Bounded context Pricing (kalkulatory, komponenty, wersje)
+|-- Szlakomat.Pricing.Application/                  # CalculatePrice (MediatR)
+|-- Szlakomat.Pricing.Infrastructure/               # AddPricingModule, seed Wawelu
+|-- Szlakomat.Pricing.Domain.Tests/
+|-- Szlakomat.Pricing.Application.Tests/
 |
 +-- Szlakomat.Products.Architecture.Tests/          # Funkcje sprawdzające dopasowanie architektury
     |-- SeedWork/TestBase.cs
@@ -773,6 +780,20 @@ source/
 | `RelationshipsController` | POST | `/api/relationships` | Definiuj relację (wymaga `fromIdentifierType` + `toIdentifierType`: `UUID`/`ISBN`/`GTIN`/`INSPIRE`) |
 | `RelationshipsController` | GET | `/api/relationships?from=...` | Pobierz relacje od produktu (zwraca `ProductRelationshipView`) |
 | `RelationshipsController` | DELETE | `/api/relationships/{id}` | Usuń relację |
+| `PricingController` | POST | `/api/pricing/calculate` | Oblicz cenę dla wpisu katalogowego i kontekstu wizyty (moduł Pricing) |
+
+**Przykład żądania** -- oblicz cenę biletu (Skarbiec — po `GET /api/catalog` weź `catalogEntryId` wpisu „Skarbiec Koronny”):
+
+```bash
+curl -X POST http://localhost:5000/api/pricing/calculate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "catalogEntryId": "CATALOG-...",
+    "visitDate": "2025-07-15",
+    "customerType": "STANDARD",
+    "groupSize": 1
+  }'
+```
 
 **Przykład żądania** -- definiuj typ produktu:
 

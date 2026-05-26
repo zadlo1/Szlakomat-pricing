@@ -36,10 +36,10 @@ source/
   Szlakomat.Products.Api/              ← dodajemy tylko PricingController (Etap 4)
 
   Szlakomat.Pricing.Domain/            ✅ Etap 1
-  Szlakomat.Pricing.Application/       ⬜ Etap 4
-  Szlakomat.Pricing.Infrastructure/    ⬜ Etap 4
+  Szlakomat.Pricing.Application/       ✅ Etap 4
+  Szlakomat.Pricing.Infrastructure/    ✅ Etap 4
   Szlakomat.Pricing.Domain.Tests/      ✅ Etap 1
-  Szlakomat.Pricing.Application.Tests/ ⬜ Etap 4
+  Szlakomat.Pricing.Application.Tests/ ✅ Etap 4
 ```
 
 ---
@@ -109,20 +109,20 @@ Każdy komponent ma historię wersji. Obliczenia historyczne używają reguł z 
 
 ---
 
-## Etap 4 — Integracja i API ⬜ TODO
+## Etap 4 — Integracja i API ✅ UKOŃCZONY
 
 Pricing dostępny przez HTTP. Integracja z `CatalogEntry`. Nowy bounded context w kontenerze DI.
 
 ### Checklist
 
-- [ ] `Szlakomat.Pricing.Application.csproj` i `Szlakomat.Pricing.Infrastructure.csproj` dodane do solucji
-- [ ] `CatalogEntryPricing` — mapowanie `CatalogEntryId → ComponentName`
-- [ ] Komenda `CalculatePrice` + handler (sealed, CQRS przez MediatR)
-- [ ] `PricingController` — `POST /api/pricing/calculate`
-- [ ] `PricingServiceExtensions.AddPricingModule` — rejestracja DI + seed
-- [ ] `WawelPricingSeed` — pełny seed przez `PricingFacade`
-- [ ] Rejestracja w `Program.cs` obok `AddProductModule()`
-- [ ] Journey testy przez MediatR: 6+ scenariuszy (turysta, senior, B2B, brak dostępności, nieznany wpis)
+- [x] `Szlakomat.Pricing.Application.csproj` i `Szlakomat.Pricing.Infrastructure.csproj` dodane do solucji
+- [x] `CatalogEntryPricing` — mapowanie `CatalogEntryId → ComponentName` (`ICatalogEntryPricingRepository`)
+- [x] Komenda `CalculatePrice` + handler (sealed, CQRS przez MediatR)
+- [x] `PricingController` — `POST /api/pricing/calculate`
+- [x] `PricingServiceExtensions.AddPricingModule` — rejestracja DI + seed
+- [x] `WawelPricingSeed` — Skarbiec + mapowanie z katalogu (pełne 26 pozycji → Etap 5)
+- [x] Rejestracja w `Program.cs` obok `AddProductModule()`
+- [x] Journey testy przez MediatR: 7 scenariuszy (`WawelPricingJourneyTests`)
 
 ---
 
